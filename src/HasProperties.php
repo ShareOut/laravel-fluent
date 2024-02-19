@@ -40,26 +40,13 @@ trait HasProperties
 
         $reflection = new ReflectionClass($this);
 
-        return $this->fluentProperties = collect($reflection->getProperties(ReflectionProperty::IS_PUBLIC))
-            ->filter(fn (ReflectionProperty $property) => $property->getDeclaringClass()->getName() === self::class)
-            ->reject(function (ReflectionProperty $property) {
-                return collect($property->getDeclaringClass()->getTraits())
-                    ->contains(function (ReflectionClass $trait) use ($property) {
-                        return collect($trait->getProperties(ReflectionProperty::IS_PUBLIC))
-                            ->contains(function (ReflectionProperty $traitProperty) use ($property) {
-                                return $traitProperty->getName() === $property->getName();
-                            });
-                    });
-            })
-            ->filter(fn (ReflectionProperty $property) => $property->hasType())
-            ->reject(function (ReflectionProperty $property) {
-                $attributes = collect($property->getAttributes());
-
-                return is_subclass_of($property->getType()->getName(), Model::class)
-                    || $attributes->contains(function (ReflectionAttribute $attribute) {
-                        return is_subclass_of($attribute->getName(), AbstractRelation::class);
-                    });
+        return $this->fluentProperties = collect($reflection->getProperties()) // Get all properties
+        ->filter(function (ReflectionProperty $property) { // Filter properties
+            return collect($property->getAttributes()) // Get property attributes
+            ->contains(function (ReflectionAttribute $attribute) { // Check if property has Fillable attribute
+                return $attribute->getName() === Fillable::class;
             });
+        });
     }
 
     /**

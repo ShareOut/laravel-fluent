@@ -63,13 +63,17 @@ trait HasRelations
 
         $reflection = new ReflectionClass(static::class);
 
-        return static::$fluentRelations = collect($reflection->getProperties(ReflectionProperty::IS_PUBLIC))
-            ->filter(fn (ReflectionProperty $property) => $property->class === self::class)
+        return static::$fluentRelations = collect($reflection->getProperties())
             ->filter(fn (ReflectionProperty $property) => $property->hasType())
             ->filter(function (ReflectionProperty $property) {
                 $attributes = collect($property->getAttributes());
 
-                return is_subclass_of($property->getType()->getName(), Model::class)
+                $is_fillable = collect($property->getAttributes()) // Get property attributes
+                ->contains(function (ReflectionAttribute $attribute) { // Check if property has Fillable attribute
+                    return $attribute->getName() === Fillable::class;
+                });
+
+                return $is_fillable && is_subclass_of($property->getType()->getName(), Model::class)
                     || $attributes->contains(function (ReflectionAttribute $attribute) {
                         return is_subclass_of($attribute->getName(), AbstractRelation::class);
                     });

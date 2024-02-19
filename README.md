@@ -1,9 +1,14 @@
+# Why this fork
+
+This is a fork of `laravel-fluent` modified to allow using a `#[Fillable]` attribute to specifiy wich properties are managed by Eloquent. You can use this on any properties, including `private`, `protected` and parent inherited properties.
+
+-------------
 # Laravel Fluent
 
 The package provides an expressive "fluent" way to define model attributes. It automatically builds casts at the runtime and adds a native autocompletion to the models' properties.
 
 ## Introduction
-With `laravel-fluent`, you can define Model attributes as you would do with any other class. The values will be transformed to the corresponding types depending on the native types of the properties.
+With `laravel-fluent`, you can define Model attributes as you would do with any other class using the `#[Fillable]` attribute. The values will be transformed to the corresponding types depending on the native types of the properties.
 
 Before:
 ```php
@@ -32,9 +37,12 @@ class Product extends Model
 {
     use Fluent;
 
+    #[Fillable]
     public Collection $features;
-    public float $price;
-    public int $available;
+    #[Fillable]
+    private float $price;
+    #[Fillable]
+    protected int $available;
 }
 ```
 
@@ -65,12 +73,16 @@ class Order extends Model
 {
     use Fluent;
 
+    #[Fillable]
     public int $amount;
+    #[Fillable]
     public Carbon $expires_at;
 
+    #[Fillable]
     #[AsDecimal(2)]
     public float $total;
 
+    #[Fillable]
     #[Cast('encrypted:array')]
     public array $payload;
 }
@@ -86,6 +98,7 @@ class Product extends Model
 {
     use Fluent;
 
+    #[Fillable]
     #[Relation]
     public Collection $features;
     public Category $category;
@@ -111,8 +124,10 @@ class Product extends Model
 {
     use Fluent;
 
+    #[Fillable]
     #[HasMany(Feature::class)]
     public Collection $features;
+    #[Fillable]
     #[BelongsTo]
     public Category $category;
 }
