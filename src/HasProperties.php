@@ -7,8 +7,10 @@ use Based\Fluent\Casts\Cast;
 use Based\Fluent\Relations\AbstractRelation;
 use Carbon\Carbon;
 use Carbon\CarbonImmutable;
+use Illuminate\Contracts\Database\Eloquent\CastsInboundAttributes;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
 use ReflectionAttribute;
 use ReflectionClass;
 use ReflectionProperty;
@@ -50,6 +52,46 @@ trait HasProperties
     }
 
     /**
+     * Get the fillable attributes for the model.
+     *
+     * @return array
+     */
+    public function getFillable()
+    {
+        return array_values(array_unique(array_merge(parent::getFillable(), $this->getFluentProperties()->pluck('name')->toArray())));
+    }
+
+    /**
+     * Overload the method to populate fillable properties when raw attributes are set (retrieved from db, refresh, replicate)
+     *
+     * @param  array  $attributes
+     * @param  bool  $sync
+     * @return $this
+     */
+    public function setRawAttributes(array $attributes, $sync = false)
+    {
+        $properties = $this->getFluentProperties()->pluck('name')->toArray();
+        $attributes_to_handle = [];
+
+        parent::setRawAttributes($attributes, $sync);
+
+        foreach ($properties as $property)
+        {
+            if(!array_key_exists($property, $attributes)) {
+                continue;
+            }
+
+            if(array_key_exists($property, $this->casts)) {
+                $this->{$property} = $this->castAttribute($property, $attributes[$property]);
+            } else {
+                $this->{$property} = $attributes[$property];
+            }
+        }
+
+        return $this;
+    }
+
+    /**
      * Overload the method to populate public properties from Model attributes
      * Set a given attribute on the model.
      *
@@ -86,7 +128,12 @@ trait HasProperties
                 return $property->isInitialized($this);
             })
             ->each(function (ReflectionProperty $property) {
-                parent::setAttribute($property->getName(), $this->{$property->getName()});
+                if(!in_array($property->getName(), $this->fillable)) {
+                    $this->fillable[] = $property->getName();
+                    if(!empty($this->original) && (is_array($this->original) && array_key_exists($property->getName(), $this->original))) {
+                        parent::setAttribute($property->getName(), $this->{$property->getName()});
+                    }
+                }
             });
 
         parent::mergeAttributesFromClassCasts();
@@ -172,13 +219,19 @@ trait HasProperties
     protected function getFluentCastType(ReflectionProperty $property): ?string
     {
         $type = str_replace('?', '', $property->getType());
+        $return = null;
 
         if ($attribute = $property->getAttributes()[0] ?? null) {
-            return $this->castFluentAttribute($attribute) ?? $type;
+            $return = $this->castFluentAttribute($attribute) ?? $type;
+        }
+
+        if($return && !in_array($return, [Collection::class, Illuminate\Support\Carbon::class, Carbon::class, CarbonImmutable::class, 'bool', 'int'])) {
+            return $return;
         }
 
         return match ($type) {
             Collection::class => 'collection',
+            Illuminate\Support\Carbon::class => 'datetime',
             Carbon::class => 'datetime',
             CarbonImmutable::class => 'immutable_datetime',
             'bool' => 'boolean',
